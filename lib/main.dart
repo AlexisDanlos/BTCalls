@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'dart:collection'; // for tracking discovered devices
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   runApp(const MyApp());
@@ -92,6 +93,16 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _startServer() async {
+    // request microphone and Bluetooth permissions
+    final statuses = await [
+      Permission.microphone,
+      Permission.bluetoothConnect,
+      Permission.bluetoothScan,
+    ].request();
+    if (statuses.values.any((status) => !status.isGranted)) {
+      setState(() => _status = 'Permissions required');
+      return;
+    }
     await _channel.invokeMethod('startServer');
   }
 
@@ -101,6 +112,16 @@ class _MyHomePageState extends State<MyHomePage> {
   
   Future<void> _startScan() async {
     setState(() { _devices.clear(); _seen.clear(); _status = 'scanning'; });
+    // request location and Bluetooth permissions
+    final statuses = await [
+      Permission.location,
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+    ].request();
+    if (statuses.values.any((status) => !status.isGranted)) {
+      setState(() => _status = 'Permissions required');
+      return;
+    }
     await _channel.invokeMethod('startScan');
   }
   Future<void> _stopScan() async {

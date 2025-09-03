@@ -5,7 +5,8 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- Needed for Bluetooth scan/discovery on Android 12+ -->
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <!-- Location permission needed for Bluetooth discovery on Android 6+ -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <application
