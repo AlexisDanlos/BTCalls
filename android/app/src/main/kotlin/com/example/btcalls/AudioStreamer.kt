@@ -1,0 +1,86 @@
+package com.example.btcalls
+
+import android.media.*
+import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
+import kotlin.concurrent.thread
+
+class AudioStreamer(
+    private val btIn: InputStream,
+    private val btOut: OutputStream
+) {
+    @Volatile private var running = true
+
+    private val SAMPLE_RATE = 16000
+    private val CHANNEL_IN = AudioFormat.CHANNEL_IN_MONO
+    private val CHANNEL_OUT = AudioFormat.CHANNEL_OUT_MONO
+    private val ENCODING = AudioFormat.ENCODING_PCM_16BIT
+
+    private val minBuf = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING)
+    private val recorder = AudioRecord(
+        MediaRecorder.AudioSource.MIC,
+        SAMPLE_RATE, CHANNEL_IN, ENCODING, minBuf
+    )
+    private val player = AudioTrack(
+        AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+            .build(),
+        AudioFormat.Builder()
+            .setEncoding(ENCODING)
+            .setSampleRate(SAMPLE_RATE)
+            .setChannelMask(CHANNEL_OUT)
+            .build(),
+        minBuf,
+        AudioTrack.MODE_STREAM,
+        AudioManager.AUDIO_SESSION_ID_GENERATE
+    )
+
+    fun start() {
+        thread { captureAndSend() }
+        thread { receiveAndPlay() }
+    }
+
+    private fun captureAndSend() {
+        try {
+            recorder.startRecording()
+            val buf = ByteArray(minBuf)
+            while (running) {
+                val read = recorder.read(buf, 0, buf.size)
+                if (read > 0) {
+                    btOut.write(buf, 0, read)
+                }
+            }
+        } catch (e: IOException) {
+            // socket closed or write error - stop loop
+        } finally {
+            try { recorder.stop() } catch (_: Exception) {}
+        }
+    }
+
+    private fun receiveAndPlay() {
+        try {
+            player.play()
+            val buf = ByteArray(minBuf)
+            while (running) {
+                val count = btIn.read(buf)
+                if (count > 0) {
+                    player.write(buf, 0, count)
+                }
+            }
+        } catch (e: IOException) {
+            // socket closed or read error - exit loop
+        } finally {
+            try { player.stop() } catch (_: Exception) {}
+        }
+    }
+
+    fun stop() {
+        running = false
+        recorder.release()
+        player.release()
+        btIn.close()
+        btOut.close()
+    }
+}
