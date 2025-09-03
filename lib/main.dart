@@ -63,11 +63,35 @@ class _MyHomePageState extends State<MyHomePage> {
   final _devices = <Map<String, String>>[];
   final Set<String> _seen = HashSet();
   String _status = 'idle';
+  // Removed local address fetching
+  // controller for manual server MAC input
+  final TextEditingController _manualMacController = TextEditingController();
+  // MAC address validation state
+  bool _isMacValid = false;
+  final RegExp _macRegExp = RegExp(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$');
 
   @override
   void initState() {
     super.initState();
     _channel.setMethodCallHandler(_handleNativeCall);
+    _manualMacController.addListener(_validateMac);
+  }
+
+  void _validateMac() {
+    final text = _manualMacController.text.trim();
+    final isValid = _macRegExp.hasMatch(text);
+    if (isValid != _isMacValid) {
+      setState(() {
+        _isMacValid = isValid;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _manualMacController.removeListener(_validateMac);
+    _manualMacController.dispose();
+    super.dispose();
   }
 
   Future<void> _handleNativeCall(MethodCall call) async {
@@ -131,6 +155,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _connectToDevice(String address) async {
     await _channel.invokeMethod('startClient', {'macAddress': address});
   }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -146,10 +171,30 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+  child: ListView(
+           children: [
             Text('Status: $_status'),
+            // Manual server MAC entry
+            TextField(
+              controller: _manualMacController,
+              decoration: InputDecoration(
+                labelText: 'Server MAC Address',
+                hintText: '00:11:22:33:44:55',
+                errorText: _manualMacController.text.isEmpty || _isMacValid
+                    ? null
+                    : 'Invalid MAC format',
+              ),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: _isMacValid
+                  ? () {
+                      final mac = _manualMacController.text.trim();
+                      _connectToDevice(mac);
+                    }
+                  : null,
+              child: const Text('Connect to MAC'),
+            ),
             const SizedBox(height: 16),
             const Text('Instructions:', style: TextStyle(fontWeight: FontWeight.bold)),
             const Text('• Tap Server to listen for a connection.'),
@@ -157,7 +202,6 @@ class _MyHomePageState extends State<MyHomePage> {
             const Text('• Tap a device in the list to connect.'),
             const Text('• Tap Stop Scan to end discovery.'),
             const Text('• Tap Stop to end audio streaming.'),
-            const Spacer(),
             // Button controls
             Wrap(
               spacing: 8,
@@ -172,18 +216,19 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
             const SizedBox(height: 16),
             Text('Discovered Devices:', style: TextStyle(fontWeight: FontWeight.bold)),
-            Expanded(
-              child: ListView.builder(
-                itemCount: _devices.length,
-                itemBuilder: (_, i) {
-                  final device = _devices[i];
-                  return ListTile(
-                    title: Text(device['name']!.isNotEmpty ? device['name']! : 'Unknown Device'),
-                    subtitle: Text('MAC: ${device['address']}'),
-                    onTap: () => _connectToDevice(device['address']!),
-                  );
-                },
-              ),
+            // Shrink-wrapped ListView for devices inside a scrollable parent
+            ListView.builder(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              itemCount: _devices.length,
+              itemBuilder: (_, i) {
+                final device = _devices[i];
+                return ListTile(
+                  title: Text(device['name']!.isNotEmpty ? device['name']! : 'Unknown Device'),
+                  subtitle: Text('MAC: ${device['address']}'),
+                  onTap: () => _connectToDevice(device['address']!),
+                );
+              },
             ),
           ],
         ),
