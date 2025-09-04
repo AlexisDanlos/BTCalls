@@ -81,7 +81,8 @@ class MainActivity : FlutterActivity() {
                         putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300)
                     }
                     startActivity(discoverIntent)
-                    server = BluetoothAudioServer(this@MainActivity) { method, arg ->
+                    val decrypt = call.argument<Boolean>("decrypt") ?: true
+                    server = BluetoothAudioServer(this@MainActivity, decrypt) { method, arg ->
                         runOnUiThread {
                             methodChannel.invokeMethod(method, arg)
                         }
@@ -103,7 +104,8 @@ class MainActivity : FlutterActivity() {
                         return@setMethodCallHandler
                     }
                     val mac = call.argument<String>("macAddress")!!
-                    client = BluetoothAudioClient(this@MainActivity) { method, arg ->
+                    val decrypt = call.argument<Boolean>("decrypt") ?: true
+                    client = BluetoothAudioClient(this@MainActivity, decrypt) { method, arg ->
                         runOnUiThread {
                             methodChannel.invokeMethod(method, arg)
                         }
@@ -147,6 +149,13 @@ class MainActivity : FlutterActivity() {
                     btAdapter?.cancelDiscovery()
                     result.success(null)
                 }
+                "setDecrypt" -> {
+                    // Toggle decryption mid-stream
+                    val decrypt = call.argument<Boolean>("decrypt") ?: true
+                    server?.toggleDecryption(decrypt)
+                    client?.toggleDecryption(decrypt)
+                    result.success(null)
+                }
                 else -> result.notImplemented()
             }
         }
@@ -171,7 +180,8 @@ class MainActivity : FlutterActivity() {
             }
             when (call.method) {
                 "startServer" -> {
-                    server = BluetoothAudioServer(this@MainActivity) { method, arg ->
+                    val decrypt = call.argument<Boolean>("decrypt") ?: true
+                    server = BluetoothAudioServer(this@MainActivity, decrypt) { method, arg ->
                         runOnUiThread { methodChannel.invokeMethod(method, arg) }
                     }
                     server?.startServer()
@@ -179,7 +189,8 @@ class MainActivity : FlutterActivity() {
                 }
                 "startClient" -> {
                     val mac = call.argument<String>("macAddress")!!
-                    client = BluetoothAudioClient(this@MainActivity) { method, arg ->
+                    val decrypt = call.argument<Boolean>("decrypt") ?: true
+                    client = BluetoothAudioClient(this@MainActivity, decrypt) { method, arg ->
                         runOnUiThread { methodChannel.invokeMethod(method, arg) }
                     }
                     client?.startClient(mac)

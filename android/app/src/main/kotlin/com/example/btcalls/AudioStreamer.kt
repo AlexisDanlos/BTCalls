@@ -5,12 +5,16 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import kotlin.concurrent.thread
+// Removed simple XOR encryption; using Cipher streams instead
 
 class AudioStreamer(
-    private val btIn: InputStream,
+    private val rawIn: InputStream,
+    private val decryptCipher: javax.crypto.Cipher,
     private val btOut: OutputStream
 ) {
     @Volatile private var running = true
+    // Toggle whether to decrypt incoming audio
+    @Volatile var decryptEnabled: Boolean = true
 
     private val SAMPLE_RATE = 16000
     private val CHANNEL_IN = AudioFormat.CHANNEL_IN_MONO
@@ -49,6 +53,7 @@ class AudioStreamer(
             while (running) {
                 val read = recorder.read(buf, 0, buf.size)
                 if (read > 0) {
+                    // Write raw audio (streams are already encrypted/decrypted)
                     btOut.write(buf, 0, read)
                 }
             }
@@ -64,9 +69,18 @@ class AudioStreamer(
             player.play()
             val buf = ByteArray(minBuf)
             while (running) {
-                val count = btIn.read(buf)
+                // Always read ciphertext from rawIn
+                val count = rawIn.read(buf)
                 if (count > 0) {
-                    player.write(buf, 0, count)
+                    // Always update cipher state to stay in sync
+                    val decrypted = decryptCipher.update(buf, 0, count)
+                    if (decryptEnabled) {
+                        // Play decrypted audio
+                        player.write(decrypted, 0, decrypted.size)
+                    } else {
+                        // Play encrypted bytes directly
+                        player.write(buf, 0, count)
+                    }
                 }
             }
         } catch (e: IOException) {
@@ -80,7 +94,8 @@ class AudioStreamer(
         running = false
         recorder.release()
         player.release()
-        btIn.close()
+        rawIn.close()
         btOut.close()
     }
+    // No explicit setter needed; flip decryptEnabled to toggle decryption in-flight
 }

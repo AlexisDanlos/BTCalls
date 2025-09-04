@@ -68,7 +68,9 @@ class _MyHomePageState extends State<MyHomePage> {
   final TextEditingController _manualMacController = TextEditingController();
   // MAC address validation state
   bool _isMacValid = false;
-  final RegExp _macRegExp = RegExp(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$');
+    final RegExp _macRegExp = RegExp(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$');
+    // Toggle decryption on received audio for demo
+    bool _decryptEnabled = true;
 
   @override
   void initState() {
@@ -127,7 +129,7 @@ class _MyHomePageState extends State<MyHomePage> {
       setState(() => _status = 'Permissions required');
       return;
     }
-    await _channel.invokeMethod('startServer');
+    await _channel.invokeMethod('startServer', {'decrypt': _decryptEnabled});
   }
 
   Future<void> _stop() async {
@@ -153,7 +155,10 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() { _status = 'scan stopped'; });
   }
   Future<void> _connectToDevice(String address) async {
-    await _channel.invokeMethod('startClient', {'macAddress': address});
+    await _channel.invokeMethod('startClient', {
+      'macAddress': address,
+      'decrypt': _decryptEnabled,
+    });
   }
   
 
@@ -197,6 +202,20 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
             const SizedBox(height: 16),
             const Text('Instructions:', style: TextStyle(fontWeight: FontWeight.bold)),
+              // Decrypt toggle switch
+              Row(
+                children: [
+                  const Text('Decrypt Audio'),
+                  Switch(
+                    value: _decryptEnabled,
+                    onChanged: (v) {
+                      setState(() => _decryptEnabled = v);
+                      // Notify native code to toggle decryption mid-call
+                      _channel.invokeMethod('setDecrypt', {'decrypt': v});
+                    },
+                  ),
+                ],
+              ),
             const Text('• Tap Server to listen for a connection.'),
             const Text('• Tap Scan to discover nearby peers.'),
             const Text('• Tap a device in the list to connect.'),
