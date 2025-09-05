@@ -34,5 +34,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
-// Legacy UI removed: HomeScreen manages the interface now
